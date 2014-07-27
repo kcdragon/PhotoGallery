@@ -21,7 +21,7 @@ public class FlickrFetchr {
 
     private static final String XML_PHOTO = "photo";
 
-    public ArrayList<GalleryItem> fetchItems() {
+    public ArrayList<GalleryItem> fetchItems(int page) {
         ArrayList<GalleryItem> items = new ArrayList<GalleryItem>();
 
         try {
@@ -29,6 +29,7 @@ public class FlickrFetchr {
                 appendQueryParameter("method", METHOD_GET_RECENT).
                 appendQueryParameter("api_key", API_KEY).
                 appendQueryParameter(PARAM_EXTRAS, EXTRA_SMALL_URL).
+                appendQueryParameter("page", Integer.toString(page)).
                 build().toString();
             String xmlString = getUrl(url);
             Log.i("FlickrFetchr", "Received xml: " + xmlString);
