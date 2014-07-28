@@ -5,6 +5,7 @@ import java.util.ArrayList;
 
 import android.content.*;
 import android.content.pm.*;
+import android.graphics.*;
 import android.os.*;
 import android.provider.*;
 import android.support.v4.app.*;
@@ -19,24 +20,29 @@ import com.bignerdranch.android.photogallery.model.*;
 public class PhotoGalleryFragment extends Fragment {
 
     private GridView gridView;
-    private TextView pageNumber;
+    private TextView pageNumberView;
 
     private ArrayList<GalleryItem> items;
-    private int page;
-
-    private int previousTotal;
-    private boolean loading;
+    private ThumbnailDownloader<ImageView> thumbnailThread;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
 
-        page = 1;
-        loading = true;
-        previousTotal = 100;
+	new FetchItemsTask().execute(1);
 
-        new FetchItemsTask().execute(page);
+	thumbnailThread = new ThumbnailDownloader<ImageView>(new Handler());
+	thumbnailThread.setListener(new ThumbnailDownloader.Listener<ImageView>() {
+	    public void onThumbnailDownloaded(ImageView imageView, Bitmap thumbnail) {
+		if (isVisible()) {
+		    imageView.setImageBitmap(thumbnail);
+		}
+	    }
+	});
+	thumbnailThread.start();
+	thumbnailThread.getLooper();
+	Log.i("PhotoGalleryFragment", "Background thread started");
     }
 
     @Override
@@ -44,25 +50,41 @@ public class PhotoGalleryFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_photo_gallery, container, false);
 
         LinearLayout gridViewHeader = (LinearLayout) view.findViewById(R.id.gridViewHeader);
-        pageNumber = (TextView) gridViewHeader.findViewById(R.id.pageNumber);
-        pageNumber.setText("Page: " + page);
+        pageNumberView = (TextView) gridViewHeader.findViewById(R.id.pageNumber);
+
+	setPageNumber(1);
 
         gridView = (GridView) view.findViewById(R.id.gridView);
         gridView.setOnScrollListener(new EndlessScrollListener() {
             public void onLoadMore(int page, int totalItemsCount) {
                 new FetchItemsTask().execute(page);
-                pageNumber.setText("Page: " + page);
+		setPageNumber(page);
             }
         });
-
-        setupAdapter();
 
         return view;
     }
 
+    @Override
+    public void onDestroyView() {
+	super.onDestroyView();
+	thumbnailThread.clearQueue();
+    }
+
+    @Override
+    public void onDestroy() {
+	super.onDestroy();
+	thumbnailThread.quit();
+	Log.i("PhotoGalleryFragment", "Background thread destroyed");
+    }
+
+    private void setPageNumber(int page) {
+	pageNumberView.setText("Page: " + page);
+    }
+
     private class FetchItemsTask extends AsyncTask<Integer, Void, ArrayList<GalleryItem>> {
         @Override
-        protected ArrayList<GalleryItem> doInBackground(Integer... params) {
+	protected ArrayList<GalleryItem> doInBackground(Integer... params) {
             return new FlickrFetchr().fetchItems(params[0]);
         }
 
@@ -70,24 +92,38 @@ public class PhotoGalleryFragment extends Fragment {
         protected void onPostExecute(ArrayList<GalleryItem> items) {
             if (PhotoGalleryFragment.this.items == null) {
                 PhotoGalleryFragment.this.items = items;
+		setupAdapter();
             }
             else {
                 PhotoGalleryFragment.this.items.addAll(items);
+		((ArrayAdapter) gridView.getAdapter()).notifyDataSetChanged();
             }
-            setupAdapter();
         }
     }
 
     private void setupAdapter() {
-        if (getActivity() == null || gridView == null) return;
+        if (getActivity() != null || gridView != null) {
+	    gridView.setAdapter(new GalleryItemAdapter(items));
+	}
+    }
 
-        if (items != null) {
-            gridView.setAdapter(new ArrayAdapter<GalleryItem>(getActivity(),
-                                                              android.R.layout.simple_gallery_item,
-                                                              items));
-        }
-        else {
-            gridView.setAdapter(null);
-        }
+    private class GalleryItemAdapter extends ArrayAdapter<GalleryItem> {
+	public GalleryItemAdapter(ArrayList<GalleryItem> items) {
+	    super(getActivity(), 0, items);
+	}
+
+	@Override
+	public View getView(int position, View convertView, ViewGroup parent) {
+	    if (convertView == null) {
+		convertView = getActivity().getLayoutInflater().inflate(R.layout.gallery_item, parent, false);
+	    }
+
+	    ImageView imageView = (ImageView) convertView.findViewById(R.id.gallery_item_imageView);
+	    imageView.setImageResource(R.drawable.brian_up_close);
+	    GalleryItem item = getItem(position);
+	    thumbnailThread.queueThumbnail(imageView, item.getUrl());
+
+	    return convertView;
+	}
     }
 }
