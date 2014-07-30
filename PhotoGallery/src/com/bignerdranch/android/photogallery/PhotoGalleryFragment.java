@@ -123,7 +123,28 @@ public class PhotoGalleryFragment extends Fragment {
 	    GalleryItem item = getItem(position);
 	    thumbnailThread.queueThumbnail(imageView, item.getUrl());
 
+            preloadPreviousAndNextTenItems(position);
+
 	    return convertView;
 	}
+
+        private void preloadPreviousAndNextTenItems(int position) {
+            int start = position - 10;
+            if (start < 0) {
+                start = 0;
+            }
+
+            int end = position + 10;
+            if (end >= getCount()) {
+                end = getCount() - 1;
+            }
+
+            for (int i = start; i <= end; i++) {
+                if (i != position) {
+                    GalleryItem itemToCache = getItem(i);
+                    thumbnailThread.queueThumbnailForPreload(itemToCache.getUrl());
+                }
+            }
+        }
     }
 }
