@@ -3,10 +3,14 @@ package com.bignerdranch.android.photogallery;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import android.app.Activity;
+import android.app.SearchManager;
+import android.app.SearchableInfo;
 import android.content.*;
 import android.content.pm.*;
 import android.graphics.*;
 import android.os.*;
+import android.preference.*;
 import android.provider.*;
 import android.support.v4.app.*;
 import android.text.*;
@@ -29,8 +33,9 @@ public class PhotoGalleryFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
+        setHasOptionsMenu(true);
 
-	new FetchItemsTask().execute(1);
+        updateItems();
 
 	thumbnailThread = new ThumbnailDownloader<ImageView>(new Handler());
 	thumbnailThread.setListener(new ThumbnailDownloader.Listener<ImageView>() {
@@ -78,24 +83,81 @@ public class PhotoGalleryFragment extends Fragment {
 	Log.i("PhotoGalleryFragment", "Background thread destroyed");
     }
 
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+        inflater.inflate(R.menu.fragment_photo_gallery, menu);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            // Pull out the SearchView
+            MenuItem searchItem = menu.findItem(R.id.menu_item_search);
+            SearchView searchView = (SearchView) searchItem.getActionView();
+
+            // Get the data from out searchable.xml as a SearchableInfo
+            SearchManager searchManager = (SearchManager) getActivity().getSystemService(Context.SEARCH_SERVICE);
+            ComponentName name = getActivity().getComponentName();
+            SearchableInfo searchInfo = searchManager.getSearchableInfo(name);
+
+            searchView.setSearchableInfo(searchInfo);
+        }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+        case R.id.menu_item_search:
+            getActivity().onSearchRequested();
+            return true;
+        case R.id.menu_item_clear:
+            PreferenceManager.getDefaultSharedPreferences(getActivity()).
+                edit().
+                putString(FlickrFetchr.PREF_SEARCH_QUERY, null).
+                commit();
+            updateItems();
+            return true;
+        default:
+            return super.onOptionsItemSelected(item);
+        }
+    }
+
+    public void updateItems() {
+        this.items = null;
+        new FetchItemsTask().execute(1);
+    }
+
     private void setPageNumber(int page) {
 	pageNumberView.setText("Page: " + page);
     }
 
-    private class FetchItemsTask extends AsyncTask<Integer, Void, ArrayList<GalleryItem>> {
+    private class FetchItemsTask extends AsyncTask<Integer, Void, GalleryItemCollection> {
         @Override
-	protected ArrayList<GalleryItem> doInBackground(Integer... params) {
-            return new FlickrFetchr().fetchItems(params[0]);
+	protected GalleryItemCollection doInBackground(Integer... params) {
+            Activity activity = getActivity();
+            if (activity == null) {
+                return new GalleryItemCollection();
+            }
+
+            String query = PreferenceManager.getDefaultSharedPreferences(activity).
+                getString(FlickrFetchr.PREF_SEARCH_QUERY, null);
+            Log.i("PhotoGalleryFragment", "FetchItemsTask received query: " + query);
+
+            if (query != null) {
+                return new FlickrFetchr().search(query, params[0]);
+            }
+            else {
+                return new FlickrFetchr().fetchItems(params[0]);
+            }
         }
 
         @Override
-        protected void onPostExecute(ArrayList<GalleryItem> items) {
+        protected void onPostExecute(GalleryItemCollection collection) {
             if (PhotoGalleryFragment.this.items == null) {
-                PhotoGalleryFragment.this.items = items;
+                PhotoGalleryFragment.this.items = collection.getItems();
+                Toast.makeText(getActivity(), "" + collection.getTotal() + " results",  Toast.LENGTH_SHORT).show();
 		setupAdapter();
             }
             else {
-                PhotoGalleryFragment.this.items.addAll(items);
+                PhotoGalleryFragment.this.items.addAll(collection.getItems());
 		((ArrayAdapter) gridView.getAdapter()).notifyDataSetChanged();
             }
         }

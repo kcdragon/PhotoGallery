@@ -37,7 +37,7 @@ public class ThumbnailDownloader<Token> extends HandlerThread {
     }
 
     public void queueThumbnail(Token token, String url) {
-	Log.i("ThumbnailDownloader", "Got a URL: " + url);
+	//Log.i("ThumbnailDownloader", "Got a URL: " + url);
 	requestMap.put(token, url);
 
 	handler.
@@ -46,7 +46,7 @@ public class ThumbnailDownloader<Token> extends HandlerThread {
     }
 
     public void queueThumbnailForPreload(String url) {
-        Log.i("ThumbnailDownloader", "Got a URL for Preload: " + url);
+        //Log.i("ThumbnailDownloader", "Got a URL for Preload: " + url);
 
         handler.
 	    obtainMessage(MESSAGE_PRELOAD, url).
@@ -57,6 +57,7 @@ public class ThumbnailDownloader<Token> extends HandlerThread {
 	handler.removeMessages(MESSAGE_DOWNLOAD);
         handler.removeMessages(MESSAGE_PRELOAD);
 	requestMap.clear();
+        thumbnailCache.evictAll();
     }
 
     @Override
@@ -67,14 +68,16 @@ public class ThumbnailDownloader<Token> extends HandlerThread {
                 switch(message.what) {
                 case MESSAGE_DOWNLOAD:
 		    Token token = (Token) message.obj;
-		    Log.i("ThumbnailDownloader", "Got a request for url: " + requestMap.get(token));
+		    //Log.i("ThumbnailDownloader", "Got a request for url: " + requestMap.get(token));
 		    handleRequest(token);
                     break;
 
                 case MESSAGE_PRELOAD:
                     String url = (String) message.obj;
-                    Log.i("ThumbnailDownloader", "Got a request for preloading url: " + url);
-                    thumbnailForUrl(url);
+                    //Log.i("ThumbnailDownloader", "Got a request for preloading url: " + url);
+                    if (url != null) {
+                        thumbnailForUrl(url);
+                    }
                     break;
                 }
 	    }
@@ -105,13 +108,13 @@ public class ThumbnailDownloader<Token> extends HandlerThread {
         try {
             if (hasThumbnailInCache(url)) {
                 bitmap = thumbnailCache.get(url);
-                Log.i("ThumbnailDownloader", "Cache hit");
+                //Log.i("ThumbnailDownloader", "Cache hit");
             }
             else {
                 byte[] bitmapBytes = new FlickrFetchr().getUrlBytes(url);
                 bitmap = BitmapFactory.decodeByteArray(bitmapBytes, 0, bitmapBytes.length);
                 thumbnailCache.put(url, bitmap);
-                Log.i("ThumbnailDownloader", "Cache miss");
+                //Log.i("ThumbnailDownloader", "Cache miss");
             }
         }
         catch (IOException e) {
