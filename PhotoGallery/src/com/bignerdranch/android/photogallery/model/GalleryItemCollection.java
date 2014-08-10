@@ -13,4 +13,8 @@ public class GalleryItemCollection {
         this.items = new ArrayList<GalleryItem>();
         this.total = total;
     }
+
+    public int getSize() {
+        return items.size();
+    }
 }

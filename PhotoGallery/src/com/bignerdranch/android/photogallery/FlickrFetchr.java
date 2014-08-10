@@ -13,7 +13,8 @@ import com.bignerdranch.android.photogallery.model.*;
 
 public class FlickrFetchr {
 
-    public static final String PREF_SEARCH_QUERY = "searchQuery";
+    public static final String PREF_SEARCH_QUERY   = "searchQuery";
+    public static final String PREF_LAST_RESULT_ID = "lastResultId";
 
     private static final String ENDPOINT          = "https://api.flickr.com/services/rest/";
     private static final String API_KEY           = "6766cedcc4914333cf29afc83bf7ea98";
